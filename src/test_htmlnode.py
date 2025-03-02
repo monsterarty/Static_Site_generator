@@ -1,5 +1,5 @@
 import unittest
-from htmlnode import HTMLNode, LeafNode
+from htmlnode import HTMLNode, LeafNode, ParentNode
 
 class TestHTMLNodePropsToHTML(unittest.TestCase):
     def test_props_none(self):
@@ -66,5 +66,61 @@ class TestLeafNodeToHTML(unittest.TestCase):
         expected = '<div class="myclass" id="myid">Content</div>'
         self.assertEqual(node.to_html(), expected)
 
+class TestParentNodeToHTML(unittest.TestCase):
+    def test_to_html_with_children(self):
+        child_node = LeafNode("span", "child")
+        parent_node = ParentNode("div", [child_node])
+        self.assertEqual(parent_node.to_html(), "<div><span>child</span></div>")
+
+    def test_to_html_with_grandchildren(self):
+        grandchild_node = LeafNode("b", "grandchild")
+        child_node = ParentNode("span", [grandchild_node])
+        parent_node = ParentNode("div", [child_node])
+        self.assertEqual(
+            parent_node.to_html(),
+            "<div><span><b>grandchild</b></span></div>",
+        )
+        
+    def test_empty_tag_raises_error(self):
+        # Parent node with an empty tag should raise a ValueError.
+        with self.assertRaises(ValueError) as cm:
+            node = ParentNode("", [LeafNode("p", "child text")])
+            node.to_html()
+        self.assertEqual(str(cm.exception), "Parent nodes must have tag")
+        
+        with self.assertRaises(ValueError) as cm:
+            node = ParentNode(None, [LeafNode("p", "child text")])
+            node.to_html()
+        self.assertEqual(str(cm.exception), "Parent nodes must have tag")
+        
+    def test_empty_children_raises_error(self):
+        # Parent node with children as an empty string should raise a ValueError.
+        with self.assertRaises(ValueError) as cm:
+            node = ParentNode("div", "")
+            node.to_html()
+        self.assertEqual(str(cm.exception), "Parent nodes must have a children")
+        
+        # Similarly, if children is None.
+        with self.assertRaises(ValueError) as cm:
+            node = ParentNode("div", None)
+            node.to_html()
+        self.assertEqual(str(cm.exception), "Parent nodes must have a children")
+        
+    def test_single_child_no_props(self):
+        # A ParentNode with a single LeafNode child and no properties.
+        child = LeafNode("p", "child text")
+        parent = ParentNode("div", [child])
+        expected = "<div><p>child text</p></div>"
+        self.assertEqual(parent.to_html(), expected)
+        
+    def test_multiple_children_with_props(self):
+        # A ParentNode with multiple children and parent's properties.
+        child1 = LeafNode("p", "child1")
+        child2 = LeafNode("p", "child2")
+        props = {"class": "container", "id": "main"}
+        parent = ParentNode("section", [child1, child2], props=props)
+        expected = '<section class="container" id="main"><p>child1</p><p>child2</p></section>'
+        self.assertEqual(parent.to_html(), expected)
+        
 if __name__ == '__main__':
     unittest.main()
