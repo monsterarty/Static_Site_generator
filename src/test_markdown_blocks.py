@@ -1,5 +1,9 @@
 import unittest
-from markdown_blocks import markdown_to_blocks
+from markdown_blocks import (
+    BlockType, 
+    markdown_to_blocks, 
+    block_to_block_type
+)
 
 class TestMarkdownToBlocks(unittest.TestCase):
     def test_markdown_to_blocks(self):
@@ -57,6 +61,63 @@ class TestMarkdownToBlocks(unittest.TestCase):
         md = "Line one\n    Line two\n\tLine three"
         expected = ["Line one\nLine two\nLine three"]
         self.assertEqual(markdown_to_blocks(md), expected)
+
+class TestBlockToBlockType(unittest.TestCase):
+    def test_heading(self):
+        # Blocks starting with a heading indicator should be HEADING.
+        self.assertEqual(block_to_block_type("# Heading"), BlockType.HEADING)
+        self.assertEqual(block_to_block_type("###### Heading"), BlockType.HEADING)
+        self.assertEqual(block_to_block_type("## Something else"), BlockType.HEADING)
+
+    def test_code_block(self):
+        # A valid code block: first and last lines start with ```
+        code = "```\nprint('Hello, world!')\n```"
+        self.assertEqual(block_to_block_type(code), BlockType.CODE)
+        # Another example with more lines
+        code2 = "```\nline 1\nline 2\nline 3\n```"
+        self.assertEqual(block_to_block_type(code2), BlockType.CODE)
+
+    def test_quote_valid(self):
+        # A valid quote: every line begins with ">"
+        quote = "> This is a quote\n> Continued quote"
+        self.assertEqual(block_to_block_type(quote), BlockType.QUOTE)
+
+    def test_quote_invalid(self):
+        # If one line does not start with ">", then it's a paragraph.
+        quote_invalid = "> This is a quote\nNot a quote line"
+        self.assertEqual(block_to_block_type(quote_invalid), BlockType.PARAGRAPH)
+
+    def test_ulist_valid(self):
+        # Every line starts with "- "
+        ulist = "- Item 1\n- Item 2\n- Item 3"
+        self.assertEqual(block_to_block_type(ulist), BlockType.ULIST)
+
+    def test_ulist_invalid(self):
+        # If not every line starts with "- ", return PARAGRAPH.
+        ulist_invalid = "- Item 1\nItem 2\n- Item 3"
+        self.assertEqual(block_to_block_type(ulist_invalid), BlockType.PARAGRAPH)
+
+    def test_olist_valid(self):
+        # Sequential ordered list: 1. then 2. then 3.
+        olist = "1. First\n2. Second\n3. Third"
+        self.assertEqual(block_to_block_type(olist), BlockType.OLIST)
+
+    def test_olist_invalid(self):
+        # If the sequence is broken, return PARAGRAPH.
+        olist_invalid = "1. First\n3. Third"
+        self.assertEqual(block_to_block_type(olist_invalid), BlockType.PARAGRAPH)
+
+    def test_default_paragraph(self):
+        # Any block that doesn't match special patterns should be PARAGRAPH.
+        paragraph = "This is just a plain paragraph with no markdown formatting."
+        self.assertEqual(block_to_block_type(paragraph), BlockType.PARAGRAPH)
+
+    def test_heading_with_leading_spaces(self):
+        # If there are leading spaces, block.startswith won't detect a heading.
+        heading_with_spaces = "   # Heading with spaces"
+        self.assertEqual(block_to_block_type(heading_with_spaces), BlockType.PARAGRAPH)
+
+
 
 if __name__ == '__main__':
     unittest.main()
