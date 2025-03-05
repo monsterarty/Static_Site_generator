@@ -3,7 +3,9 @@ from textnode import TextNode, TextType
 from inline_markdown import (
     split_nodes_delimiter, 
     extract_markdown_images, 
-    extract_markdown_links
+    extract_markdown_links,
+    split_nodes_image,
+    split_nodes_link
 )
 
 class TestSplitNodesDelimiter(unittest.TestCase):
@@ -114,7 +116,6 @@ class TestSplitNodesDelimiter(unittest.TestCase):
         expected = [("", "http://example.com/empty.png")]
         self.assertEqual(extract_markdown_images(text), expected)
 
-    # Tests for extract_markdown_links
     def test_extract_markdown_links_single(self):
         text = "Here is a link: [Link text](http://example.com)"
         expected = [("Link text", "http://example.com")]
@@ -139,10 +140,122 @@ class TestSplitNodesDelimiter(unittest.TestCase):
         self.assertEqual(extract_markdown_links(text), expected)
 
     def test_extract_markdown_links_ignore_images(self):
-        # Ensure that image markdown is not extracted as a link.
         text = "Image: ![Alt](http://example.com/image.png) and link: [Link](http://example.com/link)"
         expected = [("Link", "http://example.com/link")]
         self.assertEqual(extract_markdown_links(text), expected)
     
+class TestSplitNodesImage(unittest.TestCase):
+    def test_no_image_markdown(self):
+        # If there are no image markdowns, return the original TEXT node.
+        node = TextNode("No images here", TextType.TEXT)
+        result = split_nodes_image([node])
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].text, "No images here")
+        self.assertEqual(result[0].text_type, TextType.TEXT)
+
+    def test_valid_image_single(self):
+        # Test valid image markdown splitting:
+        # "Start text ![Alt Text](http://example.com/img.png) End text"
+        input_text = "Start text ![Alt Text](http://example.com/img.png) End text"
+        node = TextNode(input_text, TextType.TEXT)
+        result = split_nodes_image([node])
+        # Expecting three nodes:
+        #   1. TEXT("Start text ")
+        #   2. IMAGE("Alt Text", url "http://example.com/img.png")
+        #   3. TEXT(" End text")
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result[0].text, "Start text ")
+        self.assertEqual(result[0].text_type, TextType.TEXT)
+        self.assertEqual(result[1].text, "Alt Text")
+        self.assertEqual(result[1].text_type, TextType.IMAGE)
+        self.assertEqual(result[1].url, "http://example.com/img.png")
+        self.assertEqual(result[2].text, " End text")
+        self.assertEqual(result[2].text_type, TextType.TEXT)
+
+    def test_valid_image_with_empty_preceding_text(self):
+        # Test case where the image markdown is at the very start.
+        input_text = "![Alt](http://example.com/img.png)After"
+        node = TextNode(input_text, TextType.TEXT)
+        result = split_nodes_image([node])
+        # Since the text before the image is empty, don't include an empty TEXT node.
+        # Expected nodes: [IMAGE("Alt", url "http://example.com/img.png"), TEXT("After")]
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0].text, "Alt")
+        self.assertEqual(result[0].text_type, TextType.IMAGE)
+        self.assertEqual(result[0].url, "http://example.com/img.png")
+        self.assertEqual(result[1].text, "After")
+        self.assertEqual(result[1].text_type, TextType.TEXT)
+
+    def test_invalid_image_unclosed(self):
+        # Test that an unclosed image markdown raises a ValueError.
+        # For example, missing the closing parenthesis:
+        input_text = "Some text ![Alt](http://example.com/img.png"
+        node = TextNode(input_text, TextType.TEXT)
+        with self.assertRaises(ValueError) as cm:
+            split_nodes_image([node])
+        self.assertIn("invalid markdown", str(cm.exception))
+
+    def test_non_text_node_image(self):
+        # Non-TEXT nodes should be left untouched.
+        node = TextNode("Some text", TextType.BOLD)
+        result = split_nodes_image([node])
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0], node)
+
+class TestSplitNodesLink(unittest.TestCase):
+    def test_no_link_markdown(self):
+        # If no link markdown is present, return the original TEXT node.
+        node = TextNode("No link here", TextType.TEXT)
+        result = split_nodes_link([node])
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].text, "No link here")
+        self.assertEqual(result[0].text_type, TextType.TEXT)
+
+    def test_valid_link_single(self):
+        # Test valid link markdown splitting:
+        # "Before [Link Text](http://example.com) after"
+        input_text = "Before [Link Text](http://example.com) after"
+        node = TextNode(input_text, TextType.TEXT)
+        result = split_nodes_link([node])
+        # Expected: [TEXT("Before "), LINK("Link Text", url "http://example.com"), TEXT(" after")]
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result[0].text, "Before ")
+        self.assertEqual(result[0].text_type, TextType.TEXT)
+        self.assertEqual(result[1].text, "Link Text")
+        self.assertEqual(result[1].text_type, TextType.LINK)
+        self.assertEqual(result[1].url, "http://example.com")
+        self.assertEqual(result[2].text, " after")
+        self.assertEqual(result[2].text_type, TextType.TEXT)
+
+    def test_valid_link_with_empty_preceding_text(self):
+        # Test where the link markdown is at the beginning.
+        input_text = "[Link](http://example.com)After"
+        node = TextNode(input_text, TextType.TEXT)
+        result = split_nodes_link([node])
+        # Expected: since there's no preceding text, only [LINK node, TEXT("After")]
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0].text, "Link")
+        self.assertEqual(result[0].text_type, TextType.LINK)
+        self.assertEqual(result[0].url, "http://example.com")
+        self.assertEqual(result[1].text, "After")
+        self.assertEqual(result[1].text_type, TextType.TEXT)
+
+    def test_invalid_link_unclosed(self):
+        # Test that an unclosed link markdown raises a ValueError.
+        # For example, missing the closing parenthesis:
+        input_text = "Some text [Link Text](http://example.com"
+        node = TextNode(input_text, TextType.TEXT)
+        with self.assertRaises(ValueError) as cm:
+            split_nodes_link([node])
+        self.assertIn("invalid markdown", str(cm.exception))
+
+    def test_non_text_node_link(self):
+        # Non-TEXT nodes should be left unchanged.
+        node = TextNode("Some text", TextType.CODE)
+        result = split_nodes_link([node])
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0], node)
+
+        
 if __name__ == '__main__':
     unittest.main()
