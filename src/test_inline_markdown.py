@@ -5,7 +5,8 @@ from inline_markdown import (
     extract_markdown_images, 
     extract_markdown_links,
     split_nodes_image,
-    split_nodes_link
+    split_nodes_link,
+    text_to_textnodes
 )
 
 class TestSplitNodesDelimiter(unittest.TestCase):
@@ -256,6 +257,46 @@ class TestSplitNodesLink(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0], node)
 
-        
+class TestTextToTextNodes(unittest.TestCase):
+    def test_combined_markdown(self):
+        # Input text with various inline markdown elements.
+        input_text = ("This is **text** with an _italic_ word and a `code block` and an "
+                      "![obi wan image](https://i.imgur.com/fJRm4Vk.jpeg) and a [link](https://boot.dev)")
+        nodes = text_to_textnodes(input_text)
+
+        # Expected breakdown:
+        # 1. TEXT: "This is "
+        # 2. BOLD: "text"
+        # 3. TEXT: " with an "
+        # 4. ITALIC: "italic"
+        # 5. TEXT: " word and a "
+        # 6. CODE: "code block"
+        # 7. TEXT: " and an "
+        # 8. IMAGE: "obi wan image" with url "https://i.imgur.com/fJRm4Vk.jpeg"
+        # 9. TEXT: " and a "
+        # 10. LINK: "link" with url "https://boot.dev"
+        expected = [
+            TextNode("This is ", TextType.TEXT),
+            TextNode("text", TextType.BOLD),
+            TextNode(" with an ", TextType.TEXT),
+            TextNode("italic", TextType.ITALIC),
+            TextNode(" word and a ", TextType.TEXT),
+            TextNode("code block", TextType.CODE),
+            TextNode(" and an ", TextType.TEXT),
+            TextNode("obi wan image", TextType.IMAGE, "https://i.imgur.com/fJRm4Vk.jpeg"),
+            TextNode(" and a ", TextType.TEXT),
+            TextNode("link", TextType.LINK, "https://boot.dev")
+        ]
+
+        # Check that the number of nodes is as expected.
+        self.assertEqual(len(nodes), len(expected), "Number of nodes does not match expected.")
+
+        # Compare each node's properties.
+        for idx, (node, exp) in enumerate(zip(nodes, expected)):
+            with self.subTest(node_index=idx):
+                self.assertEqual(node.text, exp.text, f"Text mismatch at index {idx}")
+                self.assertEqual(node.text_type, exp.text_type, f"TextType mismatch at index {idx}")
+                self.assertEqual(node.url, exp.url, f"URL mismatch at index {idx}")
+
 if __name__ == '__main__':
     unittest.main()
