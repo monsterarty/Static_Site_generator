@@ -20,12 +20,9 @@ def public_folder():
     else:
         print("Public folder not found!!\nCreating new empty folder Public")
         os.mkdir("public")
-        if os.path.exists("public"):
-            print("Success: New empty public folder created!\nAdding static files")
-            copy_files()
-        else:
-            print("Error: Couldn't create public folder")     
+        public_folder()    
 
+# Function for copy files from static to public folder
 def copy_files(src="static", dsc="public"):
 
     for file in os.listdir(src):
@@ -42,6 +39,10 @@ def copy_files(src="static", dsc="public"):
             copy_files(src_path, dsc_path)
         else:
             print(f"Error: Found ANOMALY: {src_path}")
+
+# Function to create index.html
+def create_index():
+    pass
 
 def main():
     print(TextNode("This is a text node", TextType.BOLD, "https://www.boot.dev"))
