@@ -1,5 +1,16 @@
 import os
+from pathlib import Path
 from markdown_blocks import markdown_to_html_node
+
+def generate_page_all(dir_path_content, template_path, dest_dir_path):
+    for filename in os.listdir(dir_path_content):
+        from_path = os.path.join(dir_path_content, filename)
+        dest_path = os.path.join(dest_dir_path, filename)
+        if os.path.isfile(from_path):
+            dest_path = Path(dest_path).with_suffix(".html")
+            generate_page(from_path, template_path, dest_path)
+        else:
+            generate_page_all(from_path, template_path, dest_path)
 
 # Generating page with template
 def generate_page(from_path, template_path, dest_path):
@@ -18,11 +29,9 @@ def generate_page(from_path, template_path, dest_path):
     dest_dir_path = os.path.dirname(dest_path)
     if dest_dir_path != "":
         os.makedirs(dest_dir_path, exist_ok=True)
-        print(f" CREATING DIRECTORY: {dest_dir_path}")
 
     with open(dest_path, "w") as file:
         file.write(final_html)
-        print(f"WRITING FILE: {dest_path}")
 
 # Extracting title
 def extract_title(markdown):
